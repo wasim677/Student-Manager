@@ -1,0 +1,9 @@
+# Ignore system-specific files
+*.log
+*.DS_Store
+*.swp
+
+# Ignore directories
+OneDrive/
+AppData/
+.vscode/
