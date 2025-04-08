@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
+import json
+import os
 
 
 class Student:
@@ -20,13 +22,14 @@ class StudentApp:
         self.root = root
         self.root.title("Student Manager")
         self.root.geometry("600x600")
-        self.root.configure(bg="#2e2e2e")  # Dark background
+        self.root.configure(bg="#2e2e2e")
         self.students = []
+        self.load_students()
 
         header = tk.Label(root, text="👨‍💻 Student Management App", font=("Arial", 18, "bold"), bg="#2e2e2e", fg="white")
         header.pack(pady=10)
 
-        form_frame = tk.Frame(root, bg="#2e2e2e")  # Dark frame
+        form_frame = tk.Frame(root, bg="#2e2e2e")
         form_frame.pack(pady=5)
 
         tk.Label(form_frame, text="Name:", bg="#2e2e2e", fg="white").grid(row=0, column=0, sticky="e", padx=5, pady=2)
@@ -41,14 +44,14 @@ class StudentApp:
         self.grades_entry = tk.Entry(form_frame, width=30, bg="#424242", fg="white", insertbackground="white")
         self.grades_entry.grid(row=2, column=1, padx=5, pady=2)
 
-        button_frame = tk.Frame(root, bg="#2e2e2e")  # Dark button frame
+        button_frame = tk.Frame(root, bg="#2e2e2e")
         button_frame.pack(pady=10)
 
         tk.Button(button_frame, text="Add Student", command=self.add_student, width=15, bg="gray", fg="white").grid(row=0, column=0, padx=5)
         tk.Button(button_frame, text="Update Student", command=self.update_student, width=15, bg="gray", fg="white").grid(row=0, column=1, padx=5)
         tk.Button(button_frame, text="Remove by ID", command=self.remove_student, width=15, bg="gray", fg="white").grid(row=0, column=2, padx=5)
 
-        search_frame = tk.Frame(root, bg="#2e2e2e")  # Dark search frame
+        search_frame = tk.Frame(root, bg="#2e2e2e")
         search_frame.pack(pady=10)
 
         tk.Label(search_frame, text="Search by Name or ID:", bg="#2e2e2e", fg="white").grid(row=0, column=0, sticky="e")
@@ -56,7 +59,7 @@ class StudentApp:
         self.search_entry.grid(row=0, column=1, padx=5)
         tk.Button(search_frame, text="Search", command=self.search_student, bg="gray", fg="white").grid(row=0, column=2, padx=5)
 
-        sort_frame = tk.Frame(root, bg="#2e2e2e")  # Dark sort frame
+        sort_frame = tk.Frame(root, bg="#2e2e2e")
         sort_frame.pack(pady=10)
 
         tk.Label(sort_frame, text="Sort By:", bg="#2e2e2e", fg="white").grid(row=0, column=0)
@@ -65,7 +68,7 @@ class StudentApp:
         self.sort_option.set("Name (A-Z)")
         tk.Button(sort_frame, text="List Students", command=self.list_students, bg="gray", fg="white").grid(row=0, column=2, padx=5)
 
-        self.output_box = tk.Text(root, height=15, width=70, bg="#424242", fg="white")  # Dark output box
+        self.output_box = tk.Text(root, height=15, width=70, bg="#424242", fg="white")
         self.output_box.pack(pady=15)
 
     def add_student(self):
@@ -88,7 +91,7 @@ class StudentApp:
                 messagebox.showerror("Error", f"Student with ID {student_id} already exists.")
                 return
 
-            grades = [int(g) for g in grades_str.split()]
+            grades = [int(g) for g in grades_str.replace(",", " ").split()]
             if not grades:
                 messagebox.showerror("Error", "Please enter at least one grade.")
                 return
@@ -98,12 +101,62 @@ class StudentApp:
 
             student = Student(name, student_id, grades)
             self.students.append(student)
+            self.save_students()
             messagebox.showinfo("Success", "Student added successfully!")
             self.clear_entries()
             self.list_students()
 
         except ValueError:
             messagebox.showerror("Error", "Invalid input. Please enter numbers only for ID and grades.")
+
+    def update_student(self):
+        try:
+            student_id_str = self.id_entry.get().strip()
+            if not (student_id_str.isdigit() and len(student_id_str) == 4):
+                messagebox.showerror("Error", "ID must be a 4-digit number.")
+                return
+            student_id = int(student_id_str)
+
+            name = self.name_entry.get().strip()
+            grades_str = self.grades_entry.get().strip()
+            grades = [int(g) for g in grades_str.replace(",", " ").split()]
+
+            if not name:
+                messagebox.showerror("Error", "Please enter a valid name.")
+                return
+            if not grades or not all(0 <= g <= 100 for g in grades):
+                messagebox.showerror("Error", "Grades must be between 0 and 100.")
+                return
+
+            for student in self.students:
+                if student.student_id == student_id:
+                    student.name = name
+                    student.grades = grades
+                    self.save_students()
+                    messagebox.showinfo("Success", f"Updated student with ID {student_id}")
+                    self.clear_entries()
+                    self.list_students()
+                    return
+
+            messagebox.showwarning("Not Found", "Student ID not found.")
+        except ValueError:
+            messagebox.showerror("Error", "Invalid input. Please enter numbers only for ID and grades.")
+
+    def remove_student(self):
+        try:
+            student_id = int(self.id_entry.get())
+            for i, s in enumerate(self.students):
+                if s.student_id == student_id:
+                    if messagebox.askyesno("Confirm", f"Delete student with ID {student_id}?"):
+                        del self.students[i]
+                        self.save_students()
+                        messagebox.showinfo("Removed", f"Removed student with ID {student_id}")
+                        self.clear_entries()
+                        self.list_students()
+                    return
+            messagebox.showwarning("Not Found", "Student ID not found.")
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid ID.")
 
     def list_students(self):
         self.output_box.delete("1.0", tk.END)
@@ -122,20 +175,6 @@ class StudentApp:
         for s in sorted_students:
             self.output_box.insert(tk.END, str(s) + "\n")
 
-    def remove_student(self):
-        try:
-            student_id = int(self.id_entry.get())
-            for i, s in enumerate(self.students):
-                if s.student_id == student_id:
-                    del self.students[i]
-                    messagebox.showinfo("Removed", f"Removed student with ID {student_id}")
-                    self.clear_entries()
-                    self.list_students()
-                    return
-            messagebox.showwarning("Not Found", "Student ID not found.")
-        except ValueError:
-            messagebox.showerror("Error", "Please enter a valid ID.")
-
     def search_student(self):
         query = self.search_entry.get().strip()
         self.output_box.delete("1.0", tk.END)
@@ -153,42 +192,28 @@ class StudentApp:
         if not found:
             self.output_box.insert(tk.END, f"No student found for: {query}")
 
-    def update_student(self):
-        try:
-            student_id_str = self.id_entry.get().strip()
-            if not (student_id_str.isdigit() and len(student_id_str) == 4):
-                messagebox.showerror("Error", "ID must be a 4-digit number.")
-                return
-            student_id = int(student_id_str)
-
-            name = self.name_entry.get().strip()
-            grades_str = self.grades_entry.get().strip()
-            grades = [int(g) for g in grades_str.split()]
-            if not name:
-                messagebox.showerror("Error", "Please enter a valid name.")
-                return
-            if not grades or not all(0 <= g <= 100 for g in grades):
-                messagebox.showerror("Error", "Grades must be between 0 and 100.")
-                return
-
-            for student in self.students:
-                if student.student_id == student_id:
-                    student.name = name
-                    student.grades = grades
-                    messagebox.showinfo("Success", f"Updated student with ID {student_id}")
-                    self.clear_entries()
-                    self.list_students()
-                    return
-
-            messagebox.showwarning("Not Found", "Student ID not found.")
-        except ValueError:
-            messagebox.showerror("Error", "Invalid input. Please enter numbers only for ID and grades.")
-
     def clear_entries(self):
         self.name_entry.delete(0, tk.END)
         self.id_entry.delete(0, tk.END)
         self.grades_entry.delete(0, tk.END)
         self.search_entry.delete(0, tk.END)
+
+    def save_students(self):
+        data = [
+            {"name": s.name, "student_id": s.student_id, "grades": s.grades}
+            for s in self.students
+        ]
+        with open("students.json", "w") as f:
+            json.dump(data, f)
+
+    def load_students(self):
+        if os.path.exists("students.json"):
+            with open("students.json", "r") as f:
+                try:
+                    data = json.load(f)
+                    self.students = [Student(d["name"], d["student_id"], d["grades"]) for d in data]
+                except json.JSONDecodeError:
+                    self.students = []
 
 
 if __name__ == "__main__":
